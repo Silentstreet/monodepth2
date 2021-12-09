@@ -180,7 +180,7 @@ class Trainer:
             m.eval()
 
     def train(self):
-        """Run the entire training pipeline
+        """Run the entire training pipeline 开始训练，主要训练代码在这个run_epoch()里面
         """
         self.epoch = 0
         self.step = 0
@@ -194,10 +194,12 @@ class Trainer:
         """Run a single epoch of training and validation
         """
         self.model_lr_scheduler.step()
-
+        #1.首先是通过这个set_train()函数将resnet encoder和 depth decoder模型设置为训练模式，然后通过
         print("Training")
         self.set_train()
-
+        #2.通过enumrate(self.train_loader)来返回一个batch大小的inputs数据。Batch_Size（批尺寸）是机器学习中一个重要参数，涉及诸多矛盾，下面逐一展开。
+        # batch的选择首先是下降的方向，我们不可能一次性使用全数据集
+        #而且这里每当枚举train_loader时，就会调用一次mono_dataset.py中的__getitem__()
         for batch_idx, inputs in enumerate(self.train_loader):
 
             before_op_time = time.time()
@@ -224,7 +226,9 @@ class Trainer:
                 self.val()
 
             self.step += 1
-
+    #通过上面的枚举train_loader操作就可以得到各个尺度的inputs数据
+    #return process_batch的返回值为ouputs和loss
+    #这个函数执行完后，整个train就只剩下根据loss值backward来更新梯度，并根据优化器和lr来更新权值
     def process_batch(self, inputs):
         """Pass a minibatch through the network and generate images and losses
         """
@@ -245,6 +249,7 @@ class Trainer:
             outputs = self.models["depth"](features[0])
         else:
             # Otherwise, we only feed the image with frame_id 0 through the depth encoder
+            #这两行代码求出depth。outputs是depth decoder求出来的
             features = self.models["encoder"](inputs["color_aug", 0, 0])
             outputs = self.models["depth"](features)
 
@@ -253,7 +258,7 @@ class Trainer:
 
         if self.use_pose_net:
             outputs.update(self.predict_poses(inputs, features))
-
+        #有了ouputs就可以来算loss
         self.generate_images_pred(inputs, outputs)
         losses = self.compute_losses(inputs, outputs)
 
@@ -342,16 +347,20 @@ class Trainer:
         """Generate the warped (reprojected) color images for a minibatch.
         Generated images are saved into the `outputs` dictionary.
         """
+        #outputs["disp"]直接输出的就是视差图，并且仍然多尺度[0,1,2,3]分布
         for scale in self.opt.scales:
             disp = outputs[("disp", scale)]
             if self.opt.v1_multiscale:
                 source_scale = scale
             else:
+                #将disp值映射到[0.01,10]，并求倒数就能得到深度值
                 disp = F.interpolate(
                     disp, [self.opt.height, self.opt.width], mode="bilinear", align_corners=False)
                 source_scale = 0
 
             _, depth = disp_to_depth(disp, self.opt.min_depth, self.opt.max_depth)
+
+            #将深度值存放到outputs["depth"...]中
 
             outputs[("depth", 0, scale)] = depth
 
@@ -373,14 +382,16 @@ class Trainer:
 
                     T = transformation_from_parameters(
                         axisangle[:, 0], translation[:, 0] * mean_inv_depth[:, 0], frame_id < 0)
-
+                #将深度图投影成3维点云
                 cam_points = self.backproject_depth[source_scale](
                     depth, inputs[("inv_K", source_scale)])
+                #将3维点云投影成二维图像
                 pix_coords = self.project_3d[source_scale](
                     cam_points, inputs[("K", source_scale)], T)
-
+                #将二维图像赋值给outputs[("sample"..)]
                 outputs[("sample", frame_id, scale)] = pix_coords
 
+                #outputs上某点(x,y)的三个通道像素值来自于inputs上的(x',y') 而x'和y'则由outputs(x,y)的最低维[0]和[1]
                 outputs[("color", frame_id, scale)] = F.grid_sample(
                     inputs[("color", frame_id, source_scale)],
                     outputs[("sample", frame_id, scale)],
@@ -404,11 +415,14 @@ class Trainer:
 
         return reprojection_loss
 
+    # loss值由下面这个函数来获取
     def compute_losses(self, inputs, outputs):
         """Compute the reprojection and smoothness losses for a minibatch
         """
         losses = {}
         total_loss = 0
+
+        #按尺度来计算loss
 
         for scale in self.opt.scales:
             loss = 0
@@ -418,17 +432,21 @@ class Trainer:
                 source_scale = scale
             else:
                 source_scale = 0
-
+            # 按尺度获得视差图
             disp = outputs[("disp", scale)]
+            # 按尺度获得原始输入图
             color = inputs[("color", 0, scale)]
+            # 0尺度的原始输入图
             target = inputs[("color", 0, source_scale)]
-
+            # 在stereo-training时，frame_id恒为“s”,那在单目训练的时候呢，frame_id也是恒为一个值吗？
             for frame_id in self.opt.frame_ids[1:]:
+                # 按尺度获得对应图像的预测图（即深度图转换到点云再转到二维图像最后采样得到的彩图
                 pred = outputs[("color", frame_id, scale)]
+                # 根据pred多尺度图和0尺度
                 reprojection_losses.append(self.compute_reprojection_loss(pred, target))
 
             reprojection_losses = torch.cat(reprojection_losses, 1)
-
+            # 直接对inputs["color",0,0]和["color",s,0]计算identity loss
             if not self.opt.disable_automasking:
                 identity_reprojection_losses = []
                 for frame_id in self.opt.frame_ids[1:]:

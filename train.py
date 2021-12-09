@@ -14,5 +14,5 @@ opts = options.parse()
 
 
 if __name__ == "__main__":
-    trainer = Trainer(opts)
-    trainer.train()
+    trainer = Trainer(opts) #Trainer构造函数的调用，主要是初始化和数据集的构建
+    trainer.train() #具体的执行
