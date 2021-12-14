@@ -3,6 +3,7 @@
 # This software is licensed under the terms of the Monodepth2 licence
 # which allows for non-commercial use only, the full terms of which are made
 # available in the LICENSE file.
+# 
 
 from __future__ import absolute_import, division, print_function
 
@@ -11,6 +12,7 @@ import random
 import numpy as np
 import copy
 from PIL import Image  # using pillow-simd for increased speed
+# PIL库是基本的图像save | process库
 
 import torch
 import torch.utils.data as data
@@ -20,9 +22,24 @@ from torchvision import transforms
 def pil_loader(path):
     # open path as file to avoid ResourceWarning
     # (https://github.com/python-pillow/Pillow/issues/835)
+    with open(path, 'rb') as f:              # python基础：文件对'r'和'rb'的区别
+        with Image.open(f) as img:
+            return img.convert('RGB')
+
+"""
+def pil_loader(path):
+    if not os.path.exists(path):
+        if '.jpg' in path:
+            path = path.replace('.jpg', '.png')
+        else if '.png' in path:
+            path = path.replace('.png', '.jpg')
     with open(path, 'rb') as f:
         with Image.open(f) as img:
             return img.convert('RGB')
+
+"""
+
+
 
 
 class MonoDataset(data.Dataset):
@@ -48,7 +65,7 @@ class MonoDataset(data.Dataset):
                  is_train=False,
                  img_ext='.jpg'):
         super(MonoDataset, self).__init__()
-
+        # 简单的说super().__init__()，就是继承父类的init方法
         self.data_path = data_path
         self.filenames = filenames
         self.height = height
