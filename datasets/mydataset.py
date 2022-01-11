@@ -1,3 +1,7 @@
+"""
+function: 将一个video分割为多个帧图片，并按顺序命名好
+
+"""
 import os 
 ##只是这台电脑需要移除掉python中的ros代码
 import sys
@@ -24,7 +28,7 @@ def video2frames(pathIn='',
     extract_time_interval　提取帧之间的时间间隔，默认为-1(提取所有帧)
     output_prefix　图片的前缀名，默认为frame，图片的名称为frame_00000001.jpg
     jpg_quality 输出图片的质量
-    isColor　True表示彩色，我们需要黑白
+    isColor: True表示彩色，我们需要黑白
     '''
 
     cap = cv2.VideoCapture(pathIn)
@@ -91,8 +95,44 @@ def video2frames(pathIn='',
                                     [int(cv2.IMWRITE_JPEG_QUALITY), jpg_quality])     #save frame as jpg
                         count = count + 1
         else:
-            #时间范围内并不是每帧都输出
-            print('333333')
+            # 时间范围内并不是每帧都输出
+            # 主要通过cap.set(cv2.CAP_PROP_POS_MSEC，)来控制
+            # 例如cap.set(cv2.CAP_PROP_FRAME_WIDTH, 1080) 可以设置视频的宽度
+            # 0    CAP_PROP_POS_MSEC            cv.CAP_PROP_POS_MSEC    视频文件的当前位置（以毫秒为单位）。
+            try:
+                os.mkdir(pathOut)
+            except OSError:
+                pass
+            print('Converting a video into frames......')
+            if end_extract_time is not None:
+                N = (end_extract_time - initial_extract_time) / extract_time_interval + 1
+                success = True
+                count = 0
+                while success and count < N:
+                    cap.set(cv2.CAP_PROP_POS_MSEC, (1000 * initial_extract_time + count * 1000 * extract_time_interval))
+                    success, image = cap.read()
+                    if success:
+                        if not isColor:
+                            image = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
+                        print('Write a new frame2: {}, {}th'.format(success, count+1))
+                        cv2.imwrite(os.path.join(pathOut, "{}_{:06d}.jpg".format(output_prefix, count + 1)), image,
+                                    [int(cv2.IMWRITE_JPEG_QUALITY), jpg_quality])
+                        count = count + 1
+            else:
+                success = True
+                count = 0
+                while success:
+                    cap.set(cv2.CAP_PROP_POS_MSEC, (1000 * initial_extract_time + count * 1000 * extract_time_interval))
+                    success, image = cap.read()
+                    if success:
+                        if not isColor:
+                            image = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
+                        print('Write a new frame3: {}, {}th'.format(success, count + 1))
+                        # 通过"{:06d}".format的形式可以给文件批量命名
+                        # 6表示要输出6位， d表示要输出整数
+                        cv2.imwrite(os.path.join(pathOut, "{:06d}.jpg".format(count + 1)), image,
+                                    [int(cv2.IMWRITE_JPEG_QUALITY), jpg_quality])
+                        count = count + 1
 
 #### 测试
 #import cv2 as cv 
@@ -102,7 +142,7 @@ if __name__ == '__main__':
     pathIn = '/home/max/Desktop/data/video/02.mp4'
     pathOut = '/home/max/Desktop/data/images/'
     print('11111')
-    video2frames(pathIn, pathOut, only_output_video_info=False)
+    video2frames(pathIn, pathOut, only_output_video_info=False, extract_time_interval=5)
 """
 if __name__ == '__main__':
     dir_all_zip = '/home/max/'
