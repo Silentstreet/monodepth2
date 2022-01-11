@@ -1,7 +1,7 @@
 import os 
 ##只是这台电脑需要移除掉python中的ros代码
 import sys
-sys.path.remove('/opt/ros/kinetic/lib/python2.7/dist-packages')
+# sys.path.remove('/opt/ros/kinetic/lib/python2.7/dist-packages')
 import cv2
 
 def video2frames(pathIn='',
@@ -99,8 +99,8 @@ def video2frames(pathIn='',
 #cap = cv.VideoCapture('/data_1/dataset/')
 
 if __name__ == '__main__':
-    pathIn = '/home/nld/桌面/code/video/3520201223_120135.mkv'
-    pathOut = '/home/nld/桌面/code/video/images'
+    pathIn = '/home/max/Desktop/data/video/02.mp4'
+    pathOut = '/home/max/Desktop/data/images/'
     print('11111')
     video2frames(pathIn, pathOut, only_output_video_info=False)
 """
